@@ -1,119 +1,79 @@
 import pygame
-import os
 
 class Snake:
-    def __init__(self, game_width, game_height, block_size):
+    def __init__(self, dis_width, dis_height, block_size, head_texture=None, body_texture=None):
         self.block_size = block_size
-        self.game_width = game_width
-        self.game_height = game_height
-        self.position = [game_width // 2, game_height // 2]
-        self.body = [[game_width // 2, game_height // 2]]
+        self.dis_width = dis_width
+        self.dis_height = dis_height
+        self.head_texture = head_texture
+        self.body_texture = body_texture
+        self.reset()
+    
+    def reset(self):
+        x = round(self.dis_width / 2 / self.block_size) * self.block_size
+        y = round(self.dis_height / 2 / self.block_size) * self.block_size
+        self.body = [(x, y)]
         self.direction = "RIGHT"
-        self.change_to = self.direction
-        self.head_visual_size = int(block_size * 1.2)
-        self.load_textures()
-
-    def load_textures(self):
-        """Загрузка текстур для змейки"""
-        try:
-            if not os.path.exists('assets'):
-                os.makedirs('assets')
-                
-            self.head_texture = pygame.image.load('assets/snake_head.png').convert_alpha()
-            self.head_texture = pygame.transform.scale(
-                self.head_texture, 
-                (self.head_visual_size, self.head_visual_size)
-            )
-            
-            self.body_texture = pygame.image.load('assets/snake_body.png').convert_alpha()
-            self.body_texture = pygame.transform.scale(
-                self.body_texture, 
-                (self.block_size, self.block_size)
-            )
-        except Exception as e:
-            print(f"Текстуры змейки не загружены: {e}. Используется цветная отрисовка.")
-            self.head_texture = None
-            self.body_texture = None
-
-    def move(self, food_pos):
-        """Движение змейки"""
-        # Изменение позиции головы
-        if self.direction == "RIGHT":
-            self.position[0] += self.block_size
-        elif self.direction == "LEFT":
-            self.position[0] -= self.block_size
-        elif self.direction == "UP":
-            self.position[1] -= self.block_size
-        elif self.direction == "DOWN":
-            self.position[1] += self.block_size
-        
-        # Добавление новой позиции в начало тела
-        self.body.insert(0, list(self.position))
-        
-        # Проверка, съела ли змейка еду
-         # Проверяем столкновение с едой (точное сравнение координат)
-        if (abs(self.position[0] - food_pos[0]) < self.block_size and 
-            abs(self.position[1] - food_pos[1]) < self.block_size):
-            return True  # Еда съедена
-        else:
-            self.body.pop()  # Удаляем хвост, если не ели
-            return False
-
+        self.last_direction = "RIGHT"
+    
     def change_direction(self, new_direction):
-        """Изменение направления движения"""
-        if (new_direction == "RIGHT" and not self.direction == "LEFT" or
-            new_direction == "LEFT" and not self.direction == "RIGHT" or
-            new_direction == "UP" and not self.direction == "DOWN" or
-            new_direction == "DOWN" and not self.direction == "UP"):
+        opposite_directions = {
+            "UP": "DOWN",
+            "DOWN": "UP",
+            "LEFT": "RIGHT",
+            "RIGHT": "LEFT"
+        }
+        if new_direction != opposite_directions.get(self.last_direction):
             self.direction = new_direction
-
-    def check_collision(self):
-        """Проверка столкновений"""
-        # С границами экрана
-        if (self.position[0] >= self.game_width or self.position[0] < 0 or
-            self.position[1] >= self.game_height or self.position[1] < 0):
-            return True
+    
+    def move(self, food_pos):
+        x, y = self.body[0]
         
-        # С собственным телом (кроме головы)
-        for block in self.body[1:]:
-            if self.position == block:
-                return True
-                
+        if self.direction == "UP":
+            y -= self.block_size
+        elif self.direction == "DOWN":
+            y += self.block_size
+        elif self.direction == "LEFT":
+            x -= self.block_size
+        elif self.direction == "RIGHT":
+            x += self.block_size
+        
+        self.last_direction = self.direction
+        
+        if (x, y) == food_pos:
+            self.body.insert(0, (x, y))
+            return True
+        else:
+            self.body.insert(0, (x, y))
+            self.body.pop()
+            return False
+    
+    def check_collision(self):
+        head = self.body[0]
+        if (head[0] >= self.dis_width or head[0] < 0 or
+            head[1] >= self.dis_height or head[1] < 0):
+            return True
+        if head in self.body[1:]:
+            return True
         return False
-
+    
     def draw(self, surface, color):
-        """Отрисовка змейки"""
-        for i, block in enumerate(self.body):
+        for i, segment in enumerate(self.body):
             if i == 0:  # Голова
                 if self.head_texture:
-                    rotated_head = self.rotate_head()
-                    surface.blit(
-                        rotated_head,
-                        (block[0] - (self.head_visual_size - self.block_size) // 2,
-                         block[1] - (self.head_visual_size - self.block_size) // 2)
-                    )
+                    angle = 0
+                    if self.direction == "UP":
+                        angle = 90
+                    elif self.direction == "DOWN":
+                        angle = 270
+                    elif self.direction == "LEFT":
+                        angle = 180
+                    rotated_head = pygame.transform.rotate(self.head_texture, angle)
+                    surface.blit(rotated_head, segment)
                 else:
-                    pygame.draw.rect(
-                        surface, color,
-                        [block[0], block[1], self.block_size, self.block_size],
-                        border_radius=3
-                    )
+                    pygame.draw.rect(surface, color, [segment[0], segment[1], self.block_size, self.block_size])
             else:  # Тело
                 if self.body_texture:
-                    surface.blit(self.body_texture, (block[0], block[1]))
+                    surface.blit(self.body_texture, segment)
                 else:
-                    pygame.draw.rect(
-                        surface, color,
-                        [block[0], block[1], self.block_size, self.block_size],
-                        border_radius=2
-                    )
-
-    def rotate_head(self):
-        """Поворот текстуры головы согласно направлению"""
-        angle = {
-            "RIGHT": 0,
-            "UP": 90,
-            "LEFT": 180,
-            "DOWN": 270
-        }.get(self.direction, 0)
-        return pygame.transform.rotate(self.head_texture, angle)
+                    pygame.draw.rect(surface, color, [segment[0], segment[1], self.block_size, self.block_size])
